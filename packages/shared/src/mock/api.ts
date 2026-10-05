@@ -146,8 +146,8 @@ export const mockApi = {
         saveDB(db);
         emit({ type: 'ticket:updated', payload: t });
       }
-      return simulateLatency(t);
     }
+  },
 
   swaps: {
     request: async (fromTicketId: string, toTicketId: string) => {

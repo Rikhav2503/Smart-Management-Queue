@@ -4,7 +4,6 @@
   "main": "src/index.ts",
   "types": "src/index.ts",
   "dependencies": {
-    "@careflow/shared": "^1.0.0",
     "@tanstack/react-query": "^5.104.1",
     "autoprefixer": "^10.6.1",
     "clsx": "^2.0.0",
