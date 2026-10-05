@@ -1,122 +1,59 @@
-import { useState } from 'react'
-import heroImg from './assets/hero.png'
-import reactLogo from './assets/react.svg'
-import viteLogo from './assets/vite.svg'
-import './App.css'
+import React, { useEffect } from 'react';
+import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
+import { useStaffStore } from './stores/useStaffStore';
+import { ReceptionWorkspace } from './pages/ReceptionWorkspace';
+import { DoctorWorkspace } from './pages/DoctorWorkspace';
+import { ThemeToggle } from '@careflow/shared';
 
-function App() {
-  const [count, setCount] = useState(0)
+const ProtectedRoute = ({ role, children }: { role: string, children: React.ReactNode }) => {
+  const user = useStaffStore((s) => s.user);
+  if (!user) return <Navigate to="/login" replace />;
+  if (user.role !== role) return <Navigate to="/login" replace />;
+  return <>{children}</>;
+};
+
+const Login = () => {
+  const { user, login } = useStaffStore();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    if (user?.role === 'RECEPTIONIST') navigate('/reception');
+    if (user?.role === 'DOCTOR') navigate('/doctor');
+  }, [user, navigate]);
 
   return (
-    <>
-      <section id="center">
-        <div className="hero">
-          <img src={heroImg} className="base" width="170" height="179" alt="" />
-          <img src={reactLogo} className="framework" alt="React logo" />
-          <img src={viteLogo} className="vite" alt="Vite logo" />
-        </div>
-        <div>
-          <h1>Get started</h1>
-          <p>
-            Edit <code>src/App.tsx</code> and save to test <code>HMR</code>
-          </p>
-        </div>
+    <div className="flex flex-col items-center justify-center min-h-screen p-4 bg-slate-50 dark:bg-slate-950">
+      <div className="absolute top-4 right-4"><ThemeToggle /></div>
+      <div className="bg-white dark:bg-slate-900 p-8 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-800 w-full max-w-sm text-center space-y-4">
+        <h1 className="text-2xl font-bold text-teal-600 mb-2">CareFlow Staff</h1>
         <button
-          type="button"
-          className="counter"
-          onClick={() => setCount((count) => count + 1)}
+          onClick={() => login({ id: 'u_reception', role: 'RECEPTIONIST', name: 'Demo Receptionist', phone: '1234567891', email: 'reception@demo.com', passwordHash: 'Demo@1234' })}
+          className="w-full bg-slate-800 text-white rounded-xl py-3 font-medium hover:bg-slate-700 transition-colors"
         >
-          Count is {count}
+          Login as Receptionist
         </button>
-      </section>
+        <button
+          onClick={() => login({ id: 'u_doctor', role: 'DOCTOR', name: 'Dr. Demo', phone: '1234567892', email: 'doctor@demo.com', passwordHash: 'Demo@1234' })}
+          className="w-full bg-teal-600 text-white rounded-xl py-3 font-medium hover:bg-teal-700 transition-colors"
+        >
+          Login as Doctor
+        </button>
+      </div>
+    </div>
+  );
+};
 
-      <div className="ticks"></div>
-
-      <section id="next-steps">
-        <div id="docs">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#documentation-icon"></use>
-          </svg>
-          <h2>Documentation</h2>
-          <p>Your questions, answered</p>
-          <ul>
-            <li>
-              <a href="https://vite.dev/" target="_blank">
-                <img className="logo" src={viteLogo} alt="" />
-                Explore Vite
-              </a>
-            </li>
-            <li>
-              <a href="https://react.dev/" target="_blank">
-                <img className="button-icon" src={reactLogo} alt="" />
-                Learn more
-              </a>
-            </li>
-          </ul>
-        </div>
-        <div id="social">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#social-icon"></use>
-          </svg>
-          <h2>Connect with us</h2>
-          <p>Join the Vite community</p>
-          <ul>
-            <li>
-              <a href="https://github.com/vitejs/vite" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#github-icon"></use>
-                </svg>
-                GitHub
-              </a>
-            </li>
-            <li>
-              <a href="https://chat.vite.dev/" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#discord-icon"></use>
-                </svg>
-                Discord
-              </a>
-            </li>
-            <li>
-              <a href="https://x.com/vite_js" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#x-icon"></use>
-                </svg>
-                X.com
-              </a>
-            </li>
-            <li>
-              <a href="https://bsky.app/profile/vite.dev" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#bluesky-icon"></use>
-                </svg>
-                Bluesky
-              </a>
-            </li>
-          </ul>
-        </div>
-      </section>
-
-      <div className="ticks"></div>
-      <section id="spacer"></section>
-    </>
-  )
+export default function App() {
+  return (
+    <BrowserRouter>
+      <div className="bg-slate-50 dark:bg-slate-950 min-h-screen">
+        <Routes>
+          <Route path="/login" element={<Login />} />
+          <Route path="/reception" element={<ProtectedRoute role="RECEPTIONIST"><ReceptionWorkspace /></ProtectedRoute>} />
+          <Route path="/doctor" element={<ProtectedRoute role="DOCTOR"><DoctorWorkspace /></ProtectedRoute>} />
+          <Route path="*" element={<Navigate to="/login" replace />} />
+        </Routes>
+      </div>
+    </BrowserRouter>
+  );
 }
-
-export default App

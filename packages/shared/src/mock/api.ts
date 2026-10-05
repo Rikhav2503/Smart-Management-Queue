@@ -90,9 +90,64 @@ export const mockApi = {
         emit({ type: 'ticket:updated', payload: t });
       }
       return simulateLatency(t);
+    },
+    callNext: async (doctorId: string) => {
+      const db = getDB();
+      // Use policy for orderQueue
+      let waiting = db.tickets.filter(t => t.doctorId === doctorId && t.status === 'WAITING');
+      waiting = orderQueue(waiting, db.policy);
+      if (waiting.length === 0) return simulateLatency(null);
+      const next = waiting[0];
+      next.status = 'CALLED';
+      next.calledAt = Date.now();
+      saveDB(db);
+      emit({ type: 'ticket:updated', payload: next });
+      return simulateLatency(next);
+    },
+    startConsult: async (ticketId: string) => {
+      const db = getDB();
+      const t = db.tickets.find(t => t.id === ticketId);
+      if (t) {
+        t.status = 'SERVING';
+        t.startedAt = Date.now();
+        saveDB(db);
+        emit({ type: 'ticket:updated', payload: t });
+      }
+      return simulateLatency(t);
+    },
+    completeConsult: async (ticketId: string, outcome: Types.TicketOutcome, note?: string) => {
+      const db = getDB();
+      const t = db.tickets.find(t => t.id === ticketId);
+      if (t) {
+        t.status = 'DONE';
+        t.endedAt = Date.now();
+        t.outcome = outcome;
+        t.note = note;
+        saveDB(db);
+        emit({ type: 'ticket:updated', payload: t });
+      }
+      return simulateLatency(t);
+    },
+    updateStatus: async (ticketId: string, status: Types.TicketStatus) => {
+      const db = getDB();
+      const t = db.tickets.find(t => t.id === ticketId);
+      if (t) {
+        t.status = status;
+        saveDB(db);
+        emit({ type: 'ticket:updated', payload: t });
+      }
+      return simulateLatency(t);
+    },
+    updateTier: async (ticketId: string, tier: Types.PriorityTier) => {
+      const db = getDB();
+      const t = db.tickets.find(t => t.id === ticketId);
+      if (t) {
+        t.tier = tier;
+        saveDB(db);
+        emit({ type: 'ticket:updated', payload: t });
+      }
+      return simulateLatency(t);
     }
-    // ... add more as needed
-  },
 
   swaps: {
     request: async (fromTicketId: string, toTicketId: string) => {
@@ -101,6 +156,57 @@ export const mockApi = {
       db.swaps.push(swap);
       saveDB(db);
       return simulateLatency(swap);
+    }
+  },
+
+  doctorStatus: {
+    setStatus: async (doctorId: string, status: Types.CounterStatus) => {
+      const db = getDB();
+      const counter = db.counters.find(c => c.providerUserId === doctorId);
+      if (counter) {
+        counter.status = status;
+        if (status !== 'AVAILABLE') {
+          // Trigger reassignTickets mock behavior
+          const waiting = db.tickets.filter(t => t.doctorId === doctorId && t.status === 'WAITING');
+          waiting.forEach(t => {
+            const proposal: Types.ReassignProposal = {
+              id: `rp_${Date.now()}_${t.id}`,
+              ticketId: t.id,
+              fromDoctorId: doctorId,
+              toDoctorId: 'u_doc_1', // dummy assignment to another doc
+              status: 'PENDING',
+              expiresAt: Date.now() + db.policy.reassignConsentMins * 60000
+            };
+            db.reassignProposals.push(proposal);
+            emit({ type: 'reassign:proposed', payload: proposal });
+          });
+        }
+        saveDB(db);
+        emit({ type: 'doctor:status', payload: counter });
+      }
+      return simulateLatency(counter);
+    }
+  },
+
+  reassignProposals: {
+    list: async (doctorId: string) => {
+      const db = getDB();
+      return simulateLatency(db.reassignProposals.filter(rp => rp.fromDoctorId === doctorId));
+    }
+  },
+  
+  queue: {
+    getAllByLane: async () => {
+      const db = getDB();
+      const active = db.tickets.filter(t => t.status === 'WAITING' || t.status === 'CALLED' || t.status === 'SERVING');
+      const byTier = {
+        EMERGENCY: orderQueue(active.filter(t => t.tier === 'EMERGENCY'), db.policy),
+        SENIOR: orderQueue(active.filter(t => t.tier === 'SENIOR'), db.policy),
+        MATERNITY: orderQueue(active.filter(t => t.tier === 'MATERNITY'), db.policy),
+        ACCESSIBLE: orderQueue(active.filter(t => t.tier === 'ACCESSIBLE'), db.policy),
+        STANDARD: orderQueue(active.filter(t => t.tier === 'STANDARD'), db.policy),
+      };
+      return simulateLatency(byTier);
     }
   }
 };
